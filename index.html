@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Solar System</title>
+    <script type="text/javascript" src="libs/three.js"></script>
+    <script type="text/javascript" src="libs/jquery-1.9.0.js"></script>
+    <script type="text/javascript" src="libs/tween.min.js"></script>
+    <script type="text/javascript" src="libs/TrackballControls.js"></script>
+    <script type="text/javascript" src="libs/OrbitControls-Touch.js"></script>
+    <script type="text/javascript" src="libs/Sparks.js"></script>
+    <script type="text/javascript" src="libs/dat.gui.js"></script>
+    <style>
+        body{
+            /* set margin to 0 and overflow to hidden, to
+             use the complete page */
+            margin: 0;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+
+	<!-- Div which will hold the Output -->
+	<div id="WebGL-output">
+	</div>
+	<script type="x-shader/x-vertex" id="vertexshader">
+
+				attribute float size;
+				attribute vec3 pcolor;
+
+				varying vec3 vColor;
+
+				void main() {
+
+					vColor = pcolor;
+
+					vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
+
+					gl_PointSize = size * ( 200.0 / length( mvPosition.xyz ) );
+
+					gl_Position = projectionMatrix * mvPosition;
+
+				}
+
+	</script>
+
+	<script type="x-shader/x-fragment" id="fragmentshader">
+
+				uniform sampler2D texture;
+
+				varying vec3 vColor;
+
+				void main() {
+
+					vec4 outColor = texture2D( texture, gl_PointCoord );
+
+					gl_FragColor = outColor * vec4( vColor, 1.0 );
+
+				}
+
+	</script>
+
+	<script type="application/x-glsl" id="sky-vertex">
+	    varying vec2 vUV;
+
+	    void main() {
+	      vUV = uv;
+	      vec4 pos = vec4(position, 1.0);
+	      gl_Position = projectionMatrix * modelViewMatrix * pos;
+	    }
+	</script>
+
+	<script type="application/x-glsl" id="sky-fragment">
+	    uniform sampler2D texture;
+	    varying vec2 vUV;
+
+	    void main() {
+	      vec4 sample = texture2D(texture, vUV);
+	      gl_FragColor = vec4(sample.xyz, sample.w);
+	    }
+	</script>
+
+	<script type="text/javascript">
+
+		
+	    // once everything is loaded, we run our Three.js stuff.
+	    $(function(){
+
+	    	function createSphere(radius,width,height,color,x,y,z){
+				var sphereGeometry = new THREE.SphereGeometry(radius,width,height);
+		        var sphereMaterial = new THREE.MeshPhongMaterial({
+		        	map: color, color: 0xFFFFFF
+		        });
+
+		        var sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+		        sphere.position.x=x;
+		        sphere.position.y=y;
+		        sphere.position.z=z;
+
+		        return sphere;
+			}
+
+	    	function ellipse(x,y,radiusMAX,radiusMIN,Color,rx,ry,rz){
+				var orbit = new THREE.Shape();
+		        orbit.moveTo( x+radiusMAX, 0 );
+		        for (var ang = 0; ang <2*Math.PI;ang+=0.01)
+					orbit.lineTo(x + Math.cos(ang) * radiusMAX, y + Math.sin(ang) * radiusMIN);
+
+				var points = orbit.createPointsGeometry();
+
+				var line = new THREE.Line( points, new THREE.LineBasicMaterial( { color: Color, linewidth: 1 } ) );
+				//line.position.set( -20, 0, 0 );
+				line.rotation.set( rx, ry, rz );
+
+				return line;
+			}
+	    
+	    	var scene = new THREE.Scene();
+	    	var clock = new THREE.Clock();
+
+	        // create a camera, which defines where we're looking at.
+	        var camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 10000);
+
+	        // create a render and set the size
+	        var renderer = new THREE.WebGLRenderer();
+	        
+	        renderer.setClearColor(new THREE.Color(0x000000),1.0);
+	        renderer.setSize(window.innerWidth, window.innerHeight);
+	        renderer.shadowMapEnabled = true;
+
+	        // show axes in the screen - y= green - x=red - z=blue
+	        var axes = new THREE.AxisHelper( 20 );
+	        //scene.add(axes);
+
+	        //create earht
+	        var texE = THREE.ImageUtils.loadTexture("assets/planets/Earth.png");
+	        var earht = createSphere(1,20,20,texE,0,0,20);
+	        earht.castShadow = true;
+	        scene.add(earht);
+
+	        //create mars
+	        var texM = THREE.ImageUtils.loadTexture("assets/planets/mars_1k_color.jpg");
+	        var mars = createSphere(0.53,20,20,texM,0,0,30);
+	        mars.castShadow = true;
+	        scene.add(mars);
+
+			var orbitEarth = ellipse(0,0,30,20,0x00FFFF,Math.PI/2,0,0);
+			scene.add( orbitEarth );
+
+			var orbitMars = ellipse(3,0,40,30,0xFF4418,Math.PI/2,0,0);
+			scene.add( orbitMars );
+
+			var orbitCometa = ellipse(47,0,80,60,0x555555,Math.PI/2,0,0);
+	        //scene.add(orbitCometa);
+
+	        var texComet = THREE.ImageUtils.loadTexture("assets/planets/cometa.jpg");
+	        var comet = createSphere(0.1,20,20,texComet,0,0,60);
+	        comet.castShadow = true;
+	        scene.add(comet);	        
+
+			camera.position.x = -41; 
+	        camera.position.y = 55;
+	        camera.position.z = 85;
+	        camera.lookAt(scene.position);
+
+	        //add a spotlight
+	        var spotLight = new THREE.SpotLight(0xFFFFFF);
+	        spotLight.position.set(-40,60,-10);
+	        spotLight.castShadow = true;
+	        //scene.add(spotLight);
+
+	        //create sun
+	        var sphere = new THREE.SphereGeometry( 10, 60, 60 );
+			
+	        //add pointlight
+	        var texSun = THREE.ImageUtils.loadTexture("assets/planets/sun.jpg");
+	        var pointLight = new THREE.PointLight(0xFFFFFF,5,1000);
+        	pointLight.distance = 100;
+        	pointLight.position.set(-8,0,0);
+        	pointLight.add( new THREE.Mesh( sphere, new THREE.MeshBasicMaterial( { map: texSun } ) ) );
+        	scene.add(pointLight);
+	        
+	        //particles comet
+	        var Pool = {
+
+					__pools: [],
+
+					// Get a new Vector
+
+					get: function() {
+
+						if ( this.__pools.length > 0 ) {
+
+							return this.__pools.pop();
+
+						}
+
+						console.log( "pool ran out!" )
+						return null;
+
+					},
+
+					// Release a vector back into the pool
+
+					add: function( v ) {
+
+						this.__pools.push( v );
+
+					}
+
+				};
+
+			function generateSprite() {
+				var canvas = document.createElement('canvas');
+				canvas.width = 16;
+				canvas.height = 16;
+				var context = canvas.getContext('2d');
+				var gradient = context.createRadialGradient(
+				canvas.width / 2, canvas.height / 2,
+				0,
+				canvas.width / 2, canvas.height / 2,
+				canvas.width / 2);
+				gradient.addColorStop(0, 'rgba(255,255,255,1)');
+				gradient.addColorStop(0.2, 'rgba(0,255,255,1)');
+				gradient.addColorStop(0.4, 'rgba(0,0,64,1)');
+				gradient.addColorStop(1, 'rgba(0,0,0,1)');
+				context.fillStyle = gradient;
+				context.fillRect(0, 0, canvas.width, canvas.height);
+				var texture = new THREE.Texture(canvas);
+				texture.needsUpdate = true;
+				return texture;
+				}
+
+	        var smokeParticles = new THREE.Geometry;
+			for (var i = 0; i < 70000; i++) {
+			    var particle = new THREE.Vector3(Math.random() * 2 - 1, Math.random() * 20, Math.random() * 2 - 1);
+			    smokeParticles.vertices.push(particle);
+			    Pool.add( i);
+			}
+
+			//material particles
+			var attributesParticle = {
+
+					size:  { type: 'f', value: [] },
+					pcolor: { type: 'c', value: [] }
+
+				};
+
+				var sprite = generateSprite() ;
+
+				var uniformsParticle = {
+
+					texture:   { type: "t", value: THREE.ImageUtils.loadTexture("assets/planets/Smoke.png") }
+
+				};
+
+			var material = new THREE.ShaderMaterial( {
+
+					uniforms: uniformsParticle,
+					attributes: attributesParticle,
+
+					vertexShader: document.getElementById( 'vertexshader' ).textContent,
+					fragmentShader: document.getElementById( 'fragmentshader' ).textContent,
+
+					blending: THREE.AdditiveBlending,
+					depthWrite: false,
+					transparent: true
+
+				});
+
+			/*var material = new THREE.PointCloudMaterial({
+                size: 1,
+                transparent: true,
+                map: THREE.ImageUtils.loadTexture("assets/planets/Smoke.png"),
+                opacity: 1,
+                sizeAttenuation: false,
+                blending: THREE.AdditiveBlending,
+                color: 0xFFFFFF}); */
+			
+			
+			
+			var smoke = new THREE.PointCloud(smokeParticles, material);
+			//smoke.dynamic = true;
+			//smoke.sortParticles = true;
+			
+			
+
+			var vertices = smoke.geometry.vertices;
+			var values_size = attributesParticle.size.value;
+			var values_color = attributesParticle.pcolor.value;
+			
+
+				for( var v = 0; v < vertices.length; v ++ ) {
+					values_size[ v ] = 5;
+
+					values_color[ v ] = new THREE.Color( 0xFFFFFF );
+
+					smokeParticles.vertices[ v ].set( Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY );
+
+				}
+
+			scene.add(smoke);
+
+			
+
+			var setTargetParticle = function() {
+
+					var target = Pool.get();
+					
+
+					return target;
+
+				};
+			var hue = 0;
+			var onParticleCreated = function( p ) {
+
+					var position = p.position;
+					p.target.position = position;
+
+					var target = p.target;
+
+					if ( target ) {
+						hue += 0.0003 * 1;
+						if ( hue > 1 ) hue -= 1;
+
+						values_color[ target ].setHSL( hue, 0.6, 0.1 );
+						smokeParticles.vertices[ target ] = p.position;
+
+					};
+
+				};
+
+				var onParticleDead = function( particle ) {
+
+					var target = particle.target;
+
+					if ( target ) {
+
+						// Hide the particle
+
+						values_color[ target ].setRGB( 1, 1, 1 );
+						smokeParticles.vertices[ target ].set( Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY );
+
+						// Mark particle system as available by returning to pool
+
+						Pool.add( particle.target );
+
+					}
+
+				};
+
+			var counter    = new SPARKS.SteadyCounter( 500 );
+			var emitter   = new SPARKS.Emitter( counter );
+			
+			emitterpos = new THREE.Vector3( 0, 0, 0 );
+			emitter.addInitializer( new SPARKS.Position( new SPARKS.PointZone( emitterpos ) ) );
+			emitter.addInitializer( new SPARKS.Lifetime( 1, 1 ));
+			emitter.addInitializer( new SPARKS.Target( null, setTargetParticle ) );
+			var vector = new THREE.Vector3( 0, 0, 0.3 );
+			emitter.addInitializer( new SPARKS.Velocity( new SPARKS.PointZone( vector ) ) );
+
+			emitter.addAction( new SPARKS.Age() );
+			emitter.addAction( new SPARKS.Accelerate( 0, 0, -20 ) );
+			emitter.addAction( new SPARKS.Move() );
+			emitter.addAction( new SPARKS.RandomDrift( 40, 40, 200 ) );
+
+			emitter.addCallback( "created", onParticleCreated );
+			emitter.addCallback( "dead", onParticleDead );
+
+			var cometInitRun = false;
+			emitter.start();
+			
+			function initComet(){
+				
+				for( var v = 0; v < vertices.length; v ++ ) {
+					values_size[ v ] = 9;
+
+
+				}
+				cometInitRun = true;
+				
+			}
+
+			function stopComet(){
+				
+				for( var v = 0; v < vertices.length; v ++ ) {
+					values_size[ v ] = 5;
+
+
+				}
+				cometInitRun = false;
+				
+			}
+
+			//end particles comet
+
+			//move camera
+        	var trackballControls= new THREE.OrbitControls( camera, renderer.domElement );
+	        
+
+	        //rosseta
+	        var orbitEarthRosseta = ellipse(0,0,31,21,0xFFFFFF,Math.PI/2,0,0);
+			//	scene.add( orbitEarthRosseta );
+
+			var orbitEarthRosseta2 = ellipse(3,0,41,31,0xFFFFFF,Math.PI/2,0,0);
+			//scene.add( orbitEarthRosseta2 );
+
+	        var rossetaGeometry = new THREE.BoxGeometry( 0.3, 0.3, 0.3 );
+			var rossetaMaterial = new THREE.MeshBasicMaterial( {color: 0x00ff00} );
+			var rosseta = new THREE.Mesh( rossetaGeometry, rossetaMaterial );
+			rosseta.position.x = earht.position.x + 2;
+			rosseta.position.y = earht.position.y;
+			rosseta.position.z = 0;
+			scene.add( rosseta );
+			var angMaxR = 31;
+			var angMinR = 21;
+			var posXR = 0;
+			var speedRos = 1;
+
+			//skybox
+			var uniforms = {
+	          texture: { type: 't', value: THREE.ImageUtils.loadTexture('assets/skydome.jpg') }
+	        };
+
+	        var skyboxMaterial = new THREE.ShaderMaterial( {
+	          uniforms:       uniforms,
+	          vertexShader:   document.getElementById('sky-vertex').textContent,
+	          fragmentShader: document.getElementById('sky-fragment').textContent
+	        });
+			var skyboxGeometry = new THREE.SphereGeometry(3000,60,40);
+			//var skyboxMaterial = new THREE.MeshBasicMaterial({color: 0xffffff, map:THREE.ImageUtils.loadTexture('assets/skydome.jpg'), side:THREE.BackSide})
+			var skybox = new THREE.Mesh(skyboxGeometry,skyboxMaterial);
+			skybox.position.set(0,0,0);
+			skybox.scale.set(-1, 1, 1);
+	        skybox.rotation.order = 'XZY';
+	        skybox.renderDepth = 1000.0;
+			scene.add(skybox);
+
+
+			//camera 2
+			var cameraComet = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+			scene.add(cameraComet);
+
+			cameraComet.position.x = comet.position.x;
+			cameraComet.position.y = comet.position.y;
+			cameraComet.position.z = comet.position.z+5;
+			cameraComet.lookAt( comet.position );
+
+			//camera 3
+			var cameraNave = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+			scene.add(cameraNave);
+
+			cameraNave.position.x = rosseta.position.x;
+			cameraNave.position.y = rosseta.position.y;
+			cameraNave.position.z = rosseta.position.z+5;
+			cameraNave.lookAt( rosseta.position );
+
+
+			//change of cameras
+			var activeCam = 1;
+			var speedAnimation = 1;
+
+			//gui inteerface
+			
+			var controls = new function () {
+				this.speedAnimation = 1;
+			}
+
+			var gui = new dat.GUI();
+        	gui.add(controls, 'speedAnimation',1,10);
+			
+	     
+	        $("#WebGL-output").append(renderer.domElement);
+	        var grados = 0;
+	        var timesEarth = 0;
+	        var anios = 2004;
+	        renderScene();
+
+	        function renderScene(){
+	        	var delta = clock.getDelta();
+	        	smoke.geometry.verticesNeedUpdate = true;
+
+				attributesParticle.size.needsUpdate = true;
+				attributesParticle.pcolor.needsUpdate = true;
+
+				
+				earht.position.z = 0 + Math.sin(grados*2) * 20;
+	        	earht.position.x = 0 + Math.cos(grados*2) * 30;
+	        	earht.rotation.y -= 0.04;
+
+	        	mars.position.z = 0 + Math.sin(grados*1.1) * 30;
+	        	mars.position.x = 3 + Math.cos(grados*1.1) * 40;
+	        	mars.rotation.y -= 0.04;
+
+	        	comet.position.z = 0 + Math.sin(grados*0.3) * 60;
+	        	comet.position.x = 47 + Math.cos(grados*0.3) * 80;
+	        	
+	        	if (comet.position.x < 50 && cometInitRun==false) 
+	        		initComet();
+	        	if (comet.position.x > 60 && cometInitRun==true) 
+	        		stopComet();
+
+	        	smoke.position.z = 0 + Math.sin(grados*0.3) * 60;
+	        	smoke.position.x = 47 + Math.cos(grados*0.3) * 80;
+
+	        	smoke.rotation.y = -grados*0.3;
+
+	        	pointLight.rotation.y -= 0.0005;
+
+				rosseta.position.z = 0 + Math.sin(grados*2.1*speedRos) * angMinR;
+	        	rosseta.position.x = posXR + Math.cos(grados*2.1*speedRos) * angMaxR;
+
+	        	requestAnimationFrame(renderScene);
+	        	if (activeCam == 1) {
+	        		trackballControls.update(delta);
+	        		renderer.render(scene, camera);	
+	        	}else if (activeCam ==2){
+	        		cameraComet.position.x = comet.position.x;
+					cameraComet.position.y = comet.position.y+5;
+					cameraComet.position.z = comet.position.z+5;
+					cameraComet.lookAt( comet.position );
+	        		renderer.render(scene, cameraComet);	
+	        	}else{
+	        		cameraNave.position.x = rosseta.position.x;
+					cameraNave.position.y = rosseta.position.y;
+					cameraNave.position.z = rosseta.position.z+5;
+					cameraNave.lookAt( rosseta.position );
+					renderer.render(scene, cameraNave);	
+	        	}
+	        	
+	        	grados+=0.001*controls.speedAnimation;
+	        	timesEarth += 0.001*controls.speedAnimation;
+	        	
+	        	if (timesEarth>= Math.PI) {
+	        		timesEarth = 0;
+	        		anios += 1;
+	        		console.log(anios);
+	        	}
+
+	        	if (anios == 2006) {
+	        		if (angMaxR<41 && angMinR<31) {
+	        			angMinR+=0.0066*controls.speedAnimation;
+	        			angMaxR+=0.0066*controls.speedAnimation;	
+	        		};
+	        		if (posXR<3) 
+	        			posXR+=0.002*controls.speedAnimation;
+	        		
+	        	};
+
+	        	if (anios == 2008) {
+	        		if (angMaxR>31 && angMinR>21) {
+	        			angMinR-=0.0066*controls.speedAnimation;
+	        			angMaxR-=0.0066*controls.speedAnimation;	
+	        		};
+	        		if (posXR>0) 
+	        			posXR-=0.002*controls.speedAnimation;
+	        		
+	        	};
+
+	        	if (anios == 2011 || anios == 2012) {
+	        		if (angMaxR<80 && angMinR<60) {
+	        			angMinR+=0.013*controls.speedAnimation;
+	        			angMaxR+=0.01633333*controls.speedAnimation;	
+	        		};
+	        		if (posXR<47) 
+	        			posXR+=0.01566667*controls.speedAnimation;
+	        		speedRos = 0.1;
+	        		
+	        	};
+
+	        	if (anios == 2014) {
+	        		speedRos =0.3;
+	        	}
+
+	        	
+	        }
+
+	        $(window).resize(function(){
+		  		camera.aspect = window.innerWidth / window.innerHeight;
+		        camera.updateProjectionMatrix();
+		        renderer.setSize(window.innerWidth, window.innerHeight);
+			});
+
+			$(document).on('keydown', function (e) {
+				if (e.keyCode == 49)  //number 1
+					activeCam=1;
+				if (e.keyCode == 50) //number 2
+					activeCam=2;
+				if (e.keyCode == 51) //number 3
+					activeCam=3;
+				if (e.keyCode == 52) //number 4
+					controls.speedAnimation = 1;
+				if (e.keyCode == 53) //number 5
+					controls.speedAnimation = 10;
+			});
+
+	    	
+
+	    });  
+
+	</script>
+</body>
+</html>
